@@ -36,6 +36,7 @@ global reconnectLock
 global serverLock
 global lock
 global IPList
+colors = ["green", "blue", "red"]
 notConnected = True
 
 firstConnection = True
@@ -99,13 +100,17 @@ def HandleReconnectToAnotherServer():
     global notConnected
     while (True):
         
-        print("tryng to connect to ",IPList)
-        print("")
-        #reconnectLock.acquire()
+        reconnectLock.acquire()
         
         
         if(notConnected):
-            if(IPList[0]!= (socket.gethostbyname(socket.gethostname()))):
+            print("trying to connect to ",IPList)
+            print("")
+
+            print("Next choice is " + str(IPList[0]) )
+            print("And I am " + str(socket.gethostbyname(socket.gethostname())))
+     
+            if(IPList[0] != (socket.gethostbyname(socket.gethostname()))):
                 try:
                     print("checking for old socket")
                     if(socketUseList):
@@ -129,7 +134,6 @@ def HandleReconnectToAnotherServer():
                     notConnected = False
                 except Exception as e:  
                     print("unable to connect",e)
-
                     notConnected = True
             else:
                  
@@ -144,7 +148,7 @@ def HandleReconnectToAnotherServer():
                 print("serverLock released, isServer set to true")
                 #_thread.start_new_thread(TurnClientIntoServer,(isServer,))
         
-            break
+                break
          # connect to that ip address. 
 
      
@@ -166,7 +170,7 @@ def sendConstantUpdatesToClient(conn,ip,port):
  
 def ReceiveUpdatesFromClient(conn,ip,port): 
     while True : 
-            data = conn.recv(8048) 
+            data = conn.recv(16000) 
             #check that field other wise.
             data = pickle.loads(data)
             print("serverRecievedData",data)
@@ -204,7 +208,7 @@ class UpdateClientFromServer(threading.Thread):
                     sleep(5)
                     firstConnection = False
                 syncLock.acquire()
-                data = tcpClientA.recv(8048)
+                data = tcpClientA.recv(16000)
                 syncLock.release()
 
                 data = pickle.loads(data)
@@ -223,14 +227,13 @@ class UpdateClientFromServer(threading.Thread):
                     global IPList
                     IPList = data["IPList"]
                     print(IPList)
-
             except socket.timeout:
-
                 #if its the next ip connect to that ip.
-                 
-                _thread.start_new_thread(HandleReconnectToAnotherServer,())
+                #_thread.start_new_thread(HandleReconnectToAnotherServer,())
                 #otherwiseServer lockRelease. 
                 global notConnected
+                global reconnectLock
+                reconnectLock.release()
                 notConnected = True
                 print("reconnecting to next Server")
                 pass
@@ -249,16 +252,12 @@ def TurnClientIntoServer():
         print("in while lock aquired")
         print("isServer",isServer)
         if(isServer):
-            print("isServer is true in if statement")
-            
             print("checking for old socket")
             if(socketUseList):
                 print("oldSocket found and pop")
                 oldSocket = socketUseList.pop()
                 oldSocket.shutdown(socket.SHUT_RDWR)
                 oldSocket.close()
-
-            TCP_IP = '0.0.0.0' 
             TCP_PORT = 2008
             BUFFER_SIZE = 20  # Usually 1024, but we need quick response 
             tcpServer = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
@@ -267,8 +266,7 @@ def TurnClientIntoServer():
             print("binded waiting for players")
             players = 0 
             if(isServer):
-                while players<2: 
-            
+                while players<len(IPlist) if len(IPlist) > 1 else 2:            
                     #print ("Multithreaded Python server : Waiting for connections from TCP clients..." )
                     tcpServer.listen(4) 
                     print ("Multithreaded Python server : Waiting for connections from TCP clients..." )
@@ -400,9 +398,10 @@ def doneStroke(event):
         print ("canvas List:")
         
         position = 0
+        global colors
 
         if len(AreaList)>5:
-            color = random.choice(["green","blue"])
+            color = colors[int(myUserID) % 3] 
             event.widget.config(bg=color, state="disabled")
             id = str(event.widget)
             position =0
@@ -472,7 +471,7 @@ else:
 countNumber = 0
 
 if (not isServer):
-    IPList.append(socket.gethostname())
+    IPList.append('142.58.174.144')
     _thread.start_new_thread(HandleReconnectToAnotherServer,())
     UpdateBoard = UpdateClientFromServer()
     UpdateBoard.start()
@@ -517,13 +516,3 @@ _thread.start_new_thread(TurnClientIntoServer,())
 print(window.grid_size())
 window.mainloop()
 gui = False
-
- 
-
-
-
-
-
-
-
-
