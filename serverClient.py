@@ -11,7 +11,7 @@ from time import sleep
 from tkinter import *
 import random
 
-global isServer
+ 
  
 
 global connectionIsOK
@@ -35,6 +35,9 @@ global firstConnection
 global reconnectLock
 global serverLock
 global lock
+global IPList
+notConnected = True
+
 firstConnection = True
 myUserID = ""
 canvasList = []
@@ -42,9 +45,10 @@ CurrentGameBoard = []
 AreaList = []
 lock = threading.BoundedSemaphore(value=1)
 IPList = []
+socketUseList = []
 
-#IPList.append(socket.gethostname())
-IPList = "192.168.0.17"
+
+#IPList.append ('192.168.0.17')
 ConnectionList = []
 serverLock = threading.BoundedSemaphore(value=1)
 reconnectLock = threading.BoundedSemaphore(value=1)
@@ -91,32 +95,57 @@ SquareState = GameStateObj()
 
 def HandleReconnectToAnotherServer():
     global tcpClientA
-    
+    #global IPList
+    global notConnected
     while (True):
-        reconnectLock.acquire()
         
-        if(IPList[0]!= (socket.gethostbyname(socket.gethostname()))):
-            try:
-                time.sleep(2.0)
-                host = IPList.pop(0)
-                port = 2008
-                print ("host is",host) 
-                BUFFER_SIZE = 2000 
-                syncLock.acquire()
-                tcpClientA = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
-                tcpClientA.settimeout(1.5)
-                tcpClientA.connect((host, port))
-                syncLock.release()
-                print("should be connect")
-            except:  
-                print("unable to connect")
+        print("tryng to connect to ",IPList)
+        print("")
+        #reconnectLock.acquire()
+        
+        
+        if(notConnected):
+            if(IPList[0]!= (socket.gethostbyname(socket.gethostname()))):
+                try:
+                    print("checking for old socket")
+                    if(socketUseList):
+                        print("oldSocket found and pop")
+                        oldSocket = socketUseList.pop()
+                        oldSocket.shutdown(socket.SHUT_RDWR)
+                        oldSocket.close()
+                        
+                    time.sleep(2.0)
+                    host = IPList.pop()
+                    port = 2008
+                    print ("host is",host) 
+                    print("connecting to server")
+                    syncLock.acquire()
+                    tcpClientA = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
+                    tcpClientA.settimeout(1.5)
+                    tcpClientA.connect((host, port))
+                    socketUseList.append(tcpClientA)
+                    syncLock.release()
+                    print("should be connect")
+                    notConnected = False
+                except Exception as e:  
+                    print("unable to connect",e)
 
-                reconnectLock.release()
-        else:
-            #set the serverlock
-            _thread.start_new_thread(TurnClientIntoServer,(isServer,))
-    
-        break
+                    notConnected = True
+            else:
+                 
+                print("starting new server session as Server")
+                global isServer
+                isServer= True
+
+                print("isServer",isServer)
+                #global serverLock
+                serverLock.release()
+
+                
+                print("serverLock released, isServer set to true")
+                #_thread.start_new_thread(TurnClientIntoServer,(isServer,))
+        
+            break
          # connect to that ip address. 
 
      
@@ -153,6 +182,7 @@ def ReceiveUpdatesFromClient(conn,ip,port):
                 # if not user update
                 lock.release()
             elif ( "IPList" in data):
+                global IPList
                 IPlist = data["IPList"]
 
             
@@ -165,6 +195,7 @@ class UpdateClientFromServer(threading.Thread):
        
     
     def run(self): 
+        
         global firstConnection 
         global tcpClientA
         while True :  
@@ -190,13 +221,18 @@ class UpdateClientFromServer(threading.Thread):
                             canvasList[i-1].config(background = CurrentGameBoard[i-1].color, state = CurrentGameBoard[i-1].state)#, state = CurrentGameBoard[i-1].state)
                 elif( "IPList" in data):
                     print("IpListRecieved",data["IPList"])
-                    IPlist = data["IPList"]
+                    global IPList
+                    IPList = data["IPList"]
+                    print(IPList)
+
             except socket.timeout:
 
                 #if its the next ip connect to that ip.
                  
                 _thread.start_new_thread(HandleReconnectToAnotherServer,())
                 #otherwiseServer lockRelease. 
+                global notConnected
+                notConnected = True
                 print("reconnecting to next Server")
                 pass
                     
@@ -206,19 +242,30 @@ class UpdateClientFromServer(threading.Thread):
           
 
 
-def TurnClientIntoServer(isServer):
+def TurnClientIntoServer():
+    print("entering while loops")
+    global isServer
     while(True):
         serverLock.acquire()
+        print("in while lock aquired")
+        print("isServer",isServer)
         if(isServer):
-            #tcpClientA.shutdown()
-            #tcpClientA.close()
+            print("isServer is true in if statement")
+            
+            print("checking for old socket")
+            if(socketUseList):
+                print("oldSocket found and pop")
+                oldSocket = socketUseList.pop()
+                oldSocket.shutdown(socket.SHUT_RDWR)
+                oldSocket.close()
+
             TCP_IP = '0.0.0.0' 
             TCP_PORT = 2008
             BUFFER_SIZE = 20  # Usually 1024, but we need quick response 
             tcpServer = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
             tcpServer.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
             tcpServer.bind((socket.gethostname(), TCP_PORT))    
-
+            print("binded waiting for players")
             players = 0 
             if(isServer):
                 while players<2: 
@@ -426,7 +473,7 @@ else:
 countNumber = 0
 
 if (not isServer):
-
+    IPList.append(socket.gethostname())
     _thread.start_new_thread(HandleReconnectToAnotherServer,())
     UpdateBoard = UpdateClientFromServer()
     UpdateBoard.start()
@@ -461,7 +508,7 @@ for r in range(rows):
 #Todo: add more players
 #thread.start_new_thread ( function, args[, kwargs] )
 
-_thread.start_new_thread(TurnClientIntoServer,(isServer,))
+_thread.start_new_thread(TurnClientIntoServer,())
 
 
 # update client fromNewServer
