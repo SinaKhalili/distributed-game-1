@@ -43,7 +43,8 @@ AreaList = []
 lock = threading.BoundedSemaphore(value=1)
 IPList = []
 
-IPList.append(socket.gethostname())
+#IPList.append(socket.gethostname())
+IPList = "192.168.0.17"
 ConnectionList = []
 serverLock = threading.BoundedSemaphore(value=1)
 reconnectLock = threading.BoundedSemaphore(value=1)
@@ -240,10 +241,10 @@ def TurnClientIntoServer(isServer):
 
         if(isServer):
             ownIP = socket.gethostbyname(socket.gethostname())
-            IPList.insert(0,ownIP)
+            #IPList.insert(0,ownIP)
             disctIpList = {"IPList":IPList}
 
-            for i in range (len(IPList)):#len(IPList):
+            for i in range (len(ConnectionList)):#len(IPList):
                 ConnectionList[i].send(pickle.dumps(disctIpList))
             break
 
@@ -425,7 +426,6 @@ else:
 countNumber = 0
 
 if (not isServer):
- 
 
     _thread.start_new_thread(HandleReconnectToAnotherServer,())
     UpdateBoard = UpdateClientFromServer()
