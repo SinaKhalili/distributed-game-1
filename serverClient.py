@@ -113,7 +113,7 @@ def HandleReconnectToAnotherServer():
                         oldSocket = socketUseList.pop()
                         oldSocket.shutdown(socket.SHUT_RDWR)
                         oldSocket.close()
-                        
+
                     time.sleep(2.0)
                     host = IPList.pop()
                     port = 2008
@@ -140,7 +140,6 @@ def HandleReconnectToAnotherServer():
                 print("isServer",isServer)
                 #global serverLock
                 serverLock.release()
-
                 
                 print("serverLock released, isServer set to true")
                 #_thread.start_new_thread(TurnClientIntoServer,(isServer,))
